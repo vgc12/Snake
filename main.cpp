@@ -6,6 +6,8 @@
 #include <unistd.h>
 #include <termios.h>
 #include <limits>
+#include <thread>
+#include <chrono>
 
 // Clear the screen (using ANSI escape sequences)
 void clearScreen() {
@@ -15,7 +17,7 @@ void clearScreen() {
 // Game dimensions
 const int width = 20;
 const int height = 20;
-bool canTakeInput = true;
+char keyInput;
 bool gameOver;
 int x, y, fruitX, fruitY, score;
 std::vector<std::pair<int, int>> snake;
@@ -79,43 +81,40 @@ void draw() {
 char getch() {
 
 
-        char buf = 0;
-        struct termios old = {0};
-        if (tcgetattr(0, &old) < 0)
-                perror("tcsetattr()");
-        old.c_lflag &= ~ICANON;
-        old.c_lflag &= ~ECHO;
-        old.c_cc[VMIN] = 0;
-        old.c_cc[VTIME] = 0;
-        if (tcsetattr(0, TCSANOW, &old) < 0)
-                perror("tcsetattr ICANON");
-        if (read(0, &buf, 1) < 0)
-                perror ("read()");
+    char buf = 0;
+    struct termios old = {0};
+    if (tcgetattr(0, &old) < 0)
+        perror("tcsetattr()");
+    old.c_lflag &= ~ICANON;
+    old.c_lflag &= ~ECHO;
+    old.c_cc[VMIN] = 0;
+    old.c_cc[VTIME] = 0;
+    if (tcsetattr(0, TCSANOW, &old) < 0)
+        perror("tcsetattr ICANON");
+    if (read(0, &buf, 1) < 0)
+        perror ("read()");
 
-  // Read input byte by byte and store the last byte
-    char lastByte = 0;
-    while (true) {
-        if (read(0, &buf, 1) < 0) {
-            perror("read()");
-            break;
-        }
-        if (buf == '\n' || buf == EOF) {
-            break; // Exit on newline or EOF
-        }
-        lastByte = buf; // Store the last byte read
+
+    if (read(0, &buf, 1) < 0) {
+        perror("read()");
+
     }
-        old.c_lflag |= ICANON;
-        old.c_lflag |= ECHO;
-        if (tcsetattr(0, TCSADRAIN, &old) < 0)
-                perror ("tcsetattr ~ICANON");
-        return (buf);
+
+    std::cout<<buf<<std::endl;
+    old.c_lflag |= ICANON;
+    old.c_lflag |= ECHO;
+    if (tcsetattr(0, TCSADRAIN, &old) < 0)
+        perror ("tcsetattr ~ICANON");
+    return (buf);
 }
 
-void input() {
-    char key;
 
-    key = getch();
-    switch (key) {
+
+void input() {
+
+    char keyInput = getch();
+
+    switch (keyInput) {
         case 'a':
             if (dir != RIGHT) dir = LEFT;
             break;
@@ -192,16 +191,30 @@ void logic() {
     }
 }
 
+float deltaTime = 0.0f;
+std::chrono::time_point<std::chrono::high_resolution_clock> lastTime = std::chrono::high_resolution_clock::now();
+
 int main() {
     srand(time(0));
     setup();
+    int frame = 0; // total frames since game start
 
     while (!gameOver) {
+
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+        lastTime = currentTime;
+
         draw();
         input();
         logic();
+        std::cout<<frame<<std::endl;
 
-        usleep(100000);  // Sleep for 0.1 seconds
+        frame++;
+        if (deltaTime < (1.0f / 144.0f)) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+        }
 
     }
 
